@@ -28,9 +28,10 @@
  *
  *      include_once("$FarmD/cookbook/multicat.php");
  * 
+ * File modified by Petko Yotov to work with PHP 5.5
 */
 
-$RecipeInfo['Tagger']['Version'] = '20080127';
+$RecipeInfo['Tagger']['Version'] = '20140515';
 
 SDVA($TaggerGroups, array());
 SDV($TaggerTagSeparators, array(',','/','&'));
@@ -53,12 +54,25 @@ function TaggerSetup () {
 	// markup to insert the links
 	$tags = array_keys($TaggerGroups);
 	$tagpat = implode('|', $tags);
-	Markup("tagger",
-	       '<directives','/^(\(:)?(' . $tagpat . '):(.*?)(:\))?$/e',
-	       "TaggerLinks(\$pagename, '$1', '$2', '$3', '$4')");
+	if(function_exists('Markup_e')) { # added by Petko Yotov
+    Markup_e("tagger",
+         '<directives','/^(\(:)?(' . $tagpat . '):(.*?)(:\))?$/',
+         "TaggerLinks(\$pagename, \$m[1], \$m[2], \$m[3], \$m[4])");
 
-    	// deal with the "hidden" PTVs
-    	Markup('textvar:', '<split', '/\\(:(\\w[-\\w]*):((?!\\)).*?):\\)/se', "TaggerHiddenVars(\$pagename, '$1', '$2')");
+      // deal with the "hidden" PTVs
+      Markup_e('textvar:', '<split', '/\\(:(\\w[-\\w]*):((?!\\)).*?):\\)/s', "TaggerHiddenVars(\$pagename, \$m[1], \$m[2])");
+
+	}
+	else {
+	Markup("tagger",
+         '<directives','/^(\(:)?(' . $tagpat . '):(.*?)(:\))?$/e',
+         "TaggerLinks(\$pagename, '$1', '$2', '$3', '$4')");
+
+      // deal with the "hidden" PTVs
+  Markup('textvar:', '<split', '/\\(:(\\w[-\\w]*):((?!\\)).*?):\\)/se', "TaggerHiddenVars(\$pagename, '$1', '$2')");
+
+	}
+
     	// hidden Tagger PTVs get hidden after link-processing
     	Markup('textvar:ol', ">links", '/^\(:\w[-\w]*:.*?:\)$/', '');
     }
@@ -95,7 +109,7 @@ function TaggerLinks($pagename, $prefix, $tagname, $inval, $postfix) {
 	//print "prefix=$prefix, tagname=$tagname, inval=$inval, postfix=$postfix\n";
 	$out = "$prefix$tagname:";
 	$out .= TaggerProcessTags($pagename, $catgroup, $inval);
-	$out .= "$postfix\n";
+	$out .= "$postfix";
 	return $out;
 }
 
@@ -110,7 +124,6 @@ function TaggerLinksVar($pagename, $tagname, $catgroup, $label) {
 
 function TaggerProcessTags($pagename, $catgroup, $inval, $label='LinkedName') {
 	global $TaggerTagSeparators;
-	global $TaggerGroupSeparators;
 	$out = '';
 	// don't process if there are already links there
 	if (strpos($inval, '[[') !== false)
@@ -120,26 +133,12 @@ function TaggerProcessTags($pagename, $catgroup, $inval, $label='LinkedName') {
 	else
 	{
 	    $array_sep = '';
-	    if ($TaggerGroupSeparators[$catgroup])
+	    foreach ($TaggerTagSeparators as $tsep)
 	    {
-		foreach ($TaggerGroupSeparators[$catgroup] as $tsep)
+	    	if (strpos($inval, $tsep) !== false)
 		{
-		    if (strpos($inval, $tsep) !== false)
-		    {
 			$array_sep = $tsep;
 			break;
-		    }
-		}
-	    }
-	    else
-	    {
-		foreach ($TaggerTagSeparators as $tsep)
-		{
-		    if (strpos($inval, $tsep) !== false)
-		    {
-			$array_sep = $tsep;
-			break;
-		    }
 		}
 	    }
 	    $oo = array();
@@ -175,7 +174,7 @@ function TaggerProcessTags($pagename, $catgroup, $inval, $label='LinkedName') {
 	    {
 		$out .= implode("$array_sep ", $oo);
 	    }
-	    else if ($array_sep == '/' or $array_sep == ' ')
+	    else if ($array_sep == '/')
 	    {
 		$out .= implode($array_sep, $oo);
 	    }
